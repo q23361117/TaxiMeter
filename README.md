@@ -13,12 +13,16 @@ TaxiMeterApp/
 ├─ app.json
 ├─ tsconfig.json
 └─ eas.json
+
+
 export const Rates = {
   baseFare: 70,   // 起跳價
   perKm: 25,      // 每公里
   perMin: 5,      // 每分鐘
   kmExtra: 10     // 超過公里加成
 };
+
+
 import { useState, useRef, useEffect } from 'react';
 
 export function useTimer() {
@@ -54,6 +58,8 @@ export function useTimer() {
 
   return { seconds, running, start, pause, reset };
 }
+
+
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
@@ -75,6 +81,8 @@ const styles = StyleSheet.create({
   container: { alignItems: 'center', margin: 20 },
   time: { fontSize: 48, fontWeight: 'bold' }
 });
+
+
 import React from 'react';
 import { View, Button } from 'react-native';
 import { useTimer } from '../../hooks/useTimer';
@@ -91,6 +99,8 @@ export default function MainScreen() {
     </View>
   );
 }
+
+
 {
   "name": "TaxiMeterApp",
   "version": "1.0.0",
@@ -113,6 +123,8 @@ export default function MainScreen() {
     "typescript": "^5.2.2"
   }
 }
+
+
 {
   "expo": {
     "name": "TaxiMeterApp",
@@ -126,8 +138,18 @@ export default function MainScreen() {
     "ios": { "supportsTablet": true }
   }
 }
-git clone https://github.com/q23361117@gmail.com/TaxiMeterApp.git
+
 cd TaxiMeterApp
+git init
+git add .
+git commit -m "Initial commit"
+git branch -M main
+git remote add origin https://github.com/q23361117@gmail.com/TaxiMeterApp.git
+git push -u origin main
+
 npm install
+
 npm run web
+
 npm run android
+
