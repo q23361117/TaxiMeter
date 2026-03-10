@@ -1,24 +1,23 @@
-# TaxiMeter/
-│
+TaxiMeterApp/
 ├─ app/
 │   └─ (tabs)/index.tsx        # 主頁面跳錶 UI
-├─ assets/                      # 圖片資源（可留空）
 ├─ components/
 │   └─ TimerDisplay.tsx         # 跳錶顯示元件
 ├─ constants/
 │   └─ rates.ts                 # 費率設定
 ├─ hooks/
 │   └─ useTimer.ts              # 跳錶邏輯
+├─ assets/                      # 圖片資源（可留空）
 ├─ package.json
 ├─ package-lock.json
 ├─ app.json
 ├─ tsconfig.json
 └─ eas.json
 export const Rates = {
-  baseFare: 70,       // 起跳金額
-  perKm: 25,          // 每公里
-  perMin: 5,          // 每分鐘
-  kmExtra: 10         // 超過公里加成
+  baseFare: 70,   // 起跳價
+  perKm: 25,      // 每公里
+  perMin: 5,      // 每分鐘
+  kmExtra: 10     // 超過公里加成
 };
 import { useState, useRef, useEffect } from 'react';
 
@@ -127,3 +126,8 @@ export default function MainScreen() {
     "ios": { "supportsTablet": true }
   }
 }
+git clone https://github.com/q23361117@gmail.com/TaxiMeterApp.git
+cd TaxiMeterApp
+npm install
+npm run web
+npm run android
