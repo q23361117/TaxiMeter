@@ -16,7 +16,7 @@ input, button { font-size:16px; padding:5px; margin:5px; }
 
 <h2>計程車 GPS 計費器</h2>
 
-<!-- 🔹 地圖放在控制面板上方 -->
+<!-- 地圖放在控制面板上方 -->
 <div id="map"></div>
 
 <div id="controls">
@@ -39,7 +39,7 @@ input, button { font-size:16px; padding:5px; margin:5px; }
 <button onclick="resetTrip()">重置</button>
 
 <script>
-let map, startMarker, endMarker;
+let map, startMarker=null, endMarker=null;
 let watchId=null, pathCoords=[], polylinePath;
 let startTime=0, elapsedTime=0, timerInterval=null;
 let prevPos=null, distanceKm=0;
@@ -121,26 +121,30 @@ function startTrip(){
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
 
+                // ✅ 起點 Marker
                 if(!startMarker){
                     startMarker = new google.maps.Marker({
-                        position: {lat, lng: lon},
+                        position: {lat: lat, lng: lon},
                         map: map,
                         icon: "https://maps.google.com/mapfiles/ms/icons/green-dot.png",
                         zIndex: 9999
                     });
                 }
 
+                // 累計距離
                 if(prevPos){
-                    distanceKm += getDistanceKm(prevPos.lat, prevPos.lon, lat, lon);
+                    distanceKm += getDistanceKm(prevPos.lat, prevPos.lng, lat, lon);
                     document.getElementById("distance").textContent="里程: "+distanceKm.toFixed(2)+" km";
                 }
-                prevPos={lat, lon};
+                prevPos={lat: lat, lng: lon};
 
+                // 軌跡線
                 const latlng = new google.maps.LatLng(lat, lon);
                 pathCoords.push(latlng);
                 polylinePath.setPath(pathCoords);
                 map.setCenter(latlng);
 
+                // 即時車輛 Marker
                 new google.maps.Marker({position:latlng,map});
             },
             err=>{console.error(err); alert("GPS 無法取得定位");},
@@ -160,6 +164,7 @@ function endTrip(){
     if(watchId){navigator.geolocation.clearWatch(watchId); watchId=null;}
     clearInterval(timerInterval); timerInterval=null;
 
+    // ✅ 終點 Marker
     if(prevPos && !endMarker){
         endMarker = new google.maps.Marker({
             position: {lat: prevPos.lat, lng: prevPos.lng},
