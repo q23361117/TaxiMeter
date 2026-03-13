@@ -1,178 +1,149 @@
-TaxiMeterApp/
-├─ App.js
-├─ package.json
-├─ assets/
-│  └─ icon.png
-├─ components/
-│  ├─ MeterDisplay.js
-│  └─ StartStopButton.js
-├─ screens/
-│  ├─ HomeScreen.js
-│  └─ HistoryScreen.js
-├─ utils/
-│  └─ calculateFare.js
-└─ README.md
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>計程車計費 + GPS 路線</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<style>
+body { font-family: Arial, sans-serif; text-align: center; margin:0; padding:0; }
+input, button { font-size: 16px; margin:5px; padding:5px; }
+#timer, #distance, #fare { font-size: 24px; margin:10px 0; }
+#map { height: 50vh; width: 100%; margin-top: 10px; }
+</style>
+</head>
+<body>
 
-{
-  "name": "TaxiMeterApp",
-  "version": "1.0.0",
-  "main": "node_modules/expo/AppEntry.js",
-  "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
-  },
-  "dependencies": {
-    "expo": "~50.0.0",
-    "expo-location": "~16.0.0",
-    "react": "18.2.0",
-    "react-native": "0.72.3"
-  }
+<h2>計程車計費器 + GPS 路線</h2>
+
+<div>
+名稱: <input type="text" id="taxiName" value="Taxi-001"><br>
+基本費率: <input type="number" id="baseFare" value="85"> 元<br>
+每公里費率: <input type="number" id="kmFare" value="5"> 元<br>
+每分鐘費率: <input type="number" id="timeFare" value="5"> 元<br>
+公里加成(超過15km/每公里): <input type="number" id="extraKmFare" value="10"> 元<br>
+百回機制(百回=): <input type="number" id="hundredUnit" value="100"> 元, 每回 <input type="number" id="hundredFare" value="10"> 元<br>
+固定回傭: <input type="number" id="fixedCommission" value="20"> 元
+</div>
+
+<div id="timer">時間: 00:000</div>
+<div id="distance">里程: 0.00 km</div>
+<div id="fare">車資: 0 元</div>
+
+<button onclick="startTrip()">開始</button>
+<button onclick="pauseTrip()">暫停</button>
+<button onclick="resetTrip()">重置</button>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+let startTime=0, elapsedTime=0, timerInterval=null;
+let watchId=null, prevPos=null, distanceKm=0, pathCoords=[];
+let map, polyline;
+
+// 初始化地圖
+function initMap(){
+    map = L.map('map').fitWorld();
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+    polyline = L.polyline([], { color:'red' }).addTo(map);
+    map.setView([0,0],2);
 }
 
-export const calculateFare = (distanceKm, waitingMinutes) => {
-  const baseFare = 70;      // 起跳價
-  const perKm = 20;         // 每公里費
-  const perMinuteWait = 5;  // 每分鐘等候費
+// 格式化時間 mm:SSS
+function formatTime(ms){
+    const minutes=Math.floor(ms/60000);
+    const milliseconds=ms%60000;
+    return `${minutes}:${milliseconds.toString().padStart(3,'0')}`;
+}
 
-  const distanceFare = distanceKm * perKm;
-  const waitingFare = waitingMinutes * perMinuteWait;
+// 計算GPS距離
+function getDistance(lat1,lon1,lat2,lon2){
+    const R=6371000;
+    const toRad=x=>x*Math.PI/180;
+    const dLat = toRad(lat2-lat1);
+    const dLon = toRad(lon2-lon1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+    const c = 2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+    return R*c; // 公尺
+}
 
-  const totalFare = baseFare + distanceFare + waitingFare;
-  return totalFare;
-};
+// 計算車資
+function calculateFare(){
+    const baseFare = parseFloat(document.getElementById("baseFare").value);
+    const kmFare = parseFloat(document.getElementById("kmFare").value);
+    const timeFare = parseFloat(document.getElementById("timeFare").value);
+    const extraKmFare = parseFloat(document.getElementById("extraKmFare").value);
+    const hundredUnit = parseFloat(document.getElementById("hundredUnit").value);
+    const hundredFare = parseFloat(document.getElementById("hundredFare").value);
+    const fixedCommission = parseFloat(document.getElementById("fixedCommission").value);
 
-import React, { useState, useEffect } from 'react';
-import { View, Text, Button, StyleSheet } from 'react-native';
-import * as Location from 'expo-location';
-import { calculateFare } from '../utils/calculateFare';
+    let fare = baseFare;
 
-export default function MeterDisplay({ onSaveRecord }) {
-  const [running, setRunning] = useState(false);
-  const [distance, setDistance] = useState(0);
-  const [waiting, setWaiting] = useState(0);
-  const [fare, setFare] = useState(0);
-  const [prevLocation, setPrevLocation] = useState(null);
+    fare += distanceKm * kmFare;
 
-  useEffect(() => {
-    let timer;
-    let locWatcher;
-
-    const startMeter = async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
-
-      locWatcher = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.Highest, timeInterval: 1000, distanceInterval: 1 },
-        (location) => {
-          if (prevLocation) {
-            const dx = location.coords.latitude - prevLocation.latitude;
-            const dy = location.coords.longitude - prevLocation.longitude;
-            const km = Math.sqrt(dx*dx + dy*dy) * 111; // 粗略換算 km
-            setDistance(prev => prev + km);
-            setFare(calculateFare(distance + km, waiting));
-          }
-          setPrevLocation(location.coords);
-        }
-      );
-
-      timer = setInterval(() => {
-        setWaiting(prev => prev + 1/60); // 每秒增加分鐘
-        setFare(calculateFare(distance, waiting + 1/60));
-      }, 1000);
-    };
-
-    if (running) startMeter();
-    else {
-      if (locWatcher) locWatcher.remove();
-      if (timer) clearInterval(timer);
+    if(distanceKm>15){
+        fare += (distanceKm-15)*extraKmFare;
     }
 
-    return () => {
-      if (locWatcher) locWatcher.remove();
-      if (timer) clearInterval(timer);
-    };
-  }, [running, prevLocation, distance, waiting]);
+    let waitMinutes=Math.floor(elapsedTime/60000);
+    fare += waitMinutes*timeFare;
 
-  const stopMeter = () => {
-    setRunning(false);
-    onSaveRecord && onSaveRecord({ distance, waiting, fare, timestamp: new Date() });
-    setDistance(0);
-    setWaiting(0);
-    setFare(0);
-    setPrevLocation(null);
-  };
+    let hundredTimes=Math.floor(fare/hundredUnit);
+    fare += hundredTimes*hundredFare;
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.text}>距離: {distance.toFixed(2)} km</Text>
-      <Text style={styles.text}>等候: {waiting.toFixed(2)} 分鐘</Text>
-      <Text style={styles.text}>計費: NT$ {fare.toFixed(0)}</Text>
-      <Button title={running ? "停止" : "開始"} onPress={() => running ? stopMeter() : setRunning(true)} />
-    </View>
-  );
+    fare += fixedCommission;
+
+    return Math.round(fare);
 }
 
-const styles = StyleSheet.create({
-  container: { padding: 20, alignItems: 'center' },
-  text: { fontSize: 18, marginVertical: 5 }
-});
+// 開始行程
+function startTrip(){
+    if(!timerInterval){
+        startTime=Date.now()-elapsedTime;
+        timerInterval=setInterval(()=>{
+            elapsedTime=Date.now()-startTime;
+            document.getElementById("timer").textContent="時間: "+formatTime(elapsedTime);
+            document.getElementById("fare").textContent="車資: "+calculateFare()+" 元";
+        },10);
+    }
 
-import React, { useState } from 'react';
-import { View, ScrollView, Text, StyleSheet } from 'react-native';
-import MeterDisplay from '../components/MeterDisplay';
+    if(!watchId && navigator.geolocation){
+        watchId=navigator.geolocation.watchPosition(pos=>{
+            const lat=pos.coords.latitude;
+            const lon=pos.coords.longitude;
 
-export default function HomeScreen() {
-  const [history, setHistory] = useState([]);
+            if(prevPos){
+                distanceKm += getDistance(prevPos.lat, prevPos.lon, lat, lon)/1000;
+                document.getElementById("distance").textContent="里程: "+distanceKm.toFixed(2)+" km";
+            }
+            prevPos={lat, lon};
 
-  const saveRecord = (record) => setHistory(prev => [record, ...prev]);
-
-  return (
-    <ScrollView style={styles.container}>
-      <MeterDisplay onSaveRecord={saveRecord} />
-      <Text style={styles.header}>歷史紀錄</Text>
-      {history.map((h, i) => (
-        <View key={i} style={styles.record}>
-          <Text>{h.timestamp.toLocaleString()}</Text>
-          <Text>距離: {h.distance.toFixed(2)} km | 等候: {h.waiting.toFixed(2)} 分鐘 | NT$ {h.fare.toFixed(0)}</Text>
-        </View>
-      ))}
-    </ScrollView>
-  );
+            pathCoords.push([lat, lon]);
+            polyline.setLatLngs(pathCoords);
+            map.setView([lat, lon],18);
+        },err=>{console.error(err); alert("GPS取得失敗");},{enableHighAccuracy:true,maximumAge:0,timeout:5000});
+    }
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { fontSize: 20, marginTop: 20, marginLeft: 10 },
-  record: { padding: 10, borderBottomWidth: 1, borderColor: '#ccc' }
-});
-
-import React from 'react';
-import { SafeAreaView } from 'react-native';
-import HomeScreen from './screens/HomeScreen';
-
-export default function App() {
-  return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <HomeScreen />
-    </SafeAreaView>
-  );
+// 暫停行程
+function pauseTrip(){
+    clearInterval(timerInterval); timerInterval=null;
+    if(watchId){navigator.geolocation.clearWatch(watchId); watchId=null;}
 }
 
-# TaxiMeterApp
+// 重置行程
+function resetTrip(){
+    clearInterval(timerInterval); timerInterval=null;
+    elapsedTime=0; distanceKm=0; prevPos=null; pathCoords=[];
+    document.getElementById("timer").textContent="時間: 00:000";
+    document.getElementById("distance").textContent="里程: 0.00 km";
+    document.getElementById("fare").textContent="車資: 0 元";
+    polyline.setLatLngs([]);
+    if(watchId){navigator.geolocation.clearWatch(watchId); watchId=null;}
+}
 
-一個 iOS / Android 跳錶計程車計費範例程式，使用 React Native + Expo 開發。
-
-## 功能
-- GPS 路程計算
-- 跳錶計費
-- 等候時間計費
-- 歷史紀錄
-
-## 開發 & 測試
-1. 安裝依賴
-```bash
-npm install
-
-npm start
+window.onload=initMap;
+</script>
+</body>
+</html>
