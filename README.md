@@ -112,26 +112,26 @@ const redIcon = "https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png";
 
 function addStartMarker(position){
   if(startMarker) startMarker.setMap(null);
-  startMarker = new google.maps.Marker({
-    position,
-    map,
-    icon: blueIcon,
-    zIndex: 99999,
-    title: "起跳點",
-    optimized: false
-  });
+  startMarker = new google.maps.marker.AdvancedMarkerElement({
+map: map,
+position: leg.start_location,
+content: new google.maps.marker.PinElement({
+background: "#4CAF50",
+glyphColor: "white"
+}).element
+});
 }
 
 function addEndMarker(position){
   if(endMarker) endMarker.setMap(null);
-  endMarker = new google.maps.Marker({
-    position,
-    map,
-    icon: redIcon,
-    zIndex: 99999,
-    title: "終點",
-    optimized: false
-  });
+ endMarker = new google.maps.marker.AdvancedMarkerElement({
+map: map,
+position: leg.end_location,
+content: new google.maps.marker.PinElement({
+background: "#FF0000",
+glyphColor: "white"
+}).element
+});
 }
 
 function startTrip(){
