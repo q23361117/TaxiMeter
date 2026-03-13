@@ -43,8 +43,8 @@
 
 <script>
 let map, pathPolyline;
-let startMarker = null; // 藍點起跳
-let endMarker = null;   // 紅點終點
+let movingMarker = null; // 藍點跟隨 GPS
+let endMarker = null;    // 紅點終點
 let watchId = null;
 let pathCoords = [];
 let distanceKm = 0;
@@ -54,12 +54,10 @@ let timerInterval = null;
 
 const baseFare = 60;
 const kmFare = 15;
-const timeFare = 3; // 每分鐘費用
+const timeFare = 3;
 
-// 起點藍點
 const blueIcon = "https://maps.google.com/mapfiles/ms/icons/blue-dot.png";
-// 終點紅點
-const redIcon = "https://maps.google.com/mapfiles/ms/icons/red-dot.png";
+const redIcon  = "https://maps.google.com/mapfiles/ms/icons/red-dot.png";
 
 function initMap(){
   map = new google.maps.Map(document.getElementById("map"), {
@@ -85,11 +83,11 @@ function formatTime(ms){
 }
 
 function getDistanceKm(lat1, lon1, lat2, lon2){
-  const R=6371;
-  const dLat=(lat2-lat1)*Math.PI/180;
-  const dLon=(lon2-lon1)*Math.PI/180;
-  const a=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-  const c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  const R = 6371;
+  const dLat = (lat2-lat1)*Math.PI/180;
+  const dLon = (lon2-lon1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  const c = 2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
   return R*c;
 }
 
@@ -110,28 +108,32 @@ function updateDisplay(){
   document.getElementById("totalFare").textContent = calculateFare();
 }
 
-function addStartMarker(position){
-  if(startMarker) startMarker.setMap(null);
-  startMarker = new google.maps.Marker({
-    position,
-    map,
-    icon: blueIcon,
-    zIndex: 9999,
-    title: "起跳點",
-    optimized: false
-  });
+function addMovingMarker(position){
+  if(!movingMarker){
+    movingMarker = new google.maps.Marker({
+      position,
+      map,
+      icon: blueIcon,
+      zIndex:9999,
+      title:"起跳點",
+      optimized:false
+    });
+  } else {
+    movingMarker.setPosition(position); // 更新藍點位置
+  }
 }
 
 function addEndMarker(position){
-  if(endMarker) endMarker.setMap(null);
-  endMarker = new google.maps.Marker({
-    position,
-    map,
-    icon: redIcon,
-    zIndex: 9999,
-    title: "終點",
-    optimized: false
-  });
+  if(!endMarker){
+    endMarker = new google.maps.Marker({
+      position,
+      map,
+      icon:redIcon,
+      zIndex:9999,
+      title:"終點",
+      optimized:false
+    });
+  }
 }
 
 function startTrip(){
@@ -147,16 +149,17 @@ function startTrip(){
     watchId = navigator.geolocation.watchPosition(pos=>{
       const newCoord = {lat: pos.coords.latitude, lng: pos.coords.longitude};
 
-      if(!startMarker) addStartMarker(newCoord);
+      addMovingMarker(newCoord);
 
       if(pathCoords.length > 0){
-        const last = pathCoords[pathCoords.length - 1];
+        const last = pathCoords[pathCoords.length-1];
         distanceKm += getDistanceKm(last.lat,last.lng,newCoord.lat,newCoord.lng);
       }
 
       pathCoords.push(newCoord);
       pathPolyline.setPath(pathCoords);
       map.setCenter(newCoord);
+
     }, err => { alert("GPS定位失敗"); }, { enableHighAccuracy:true });
   }
 }
@@ -173,7 +176,7 @@ function pauseTrip(){
 function endTrip(){
   pauseTrip();
   if(pathCoords.length > 0){
-    const last = pathCoords[pathCoords.length - 1];
+    const last = pathCoords[pathCoords.length-1];
     addEndMarker(last);
   }
   alert(`行程結束！\n總距離: ${distanceKm.toFixed(2)} km\n總費用: ${calculateFare()} 元`);
@@ -181,10 +184,10 @@ function endTrip(){
 
 function resetTrip(){
   pauseTrip();
-  pathCoords = [];
-  distanceKm = 0;
-  elapsedTime = 0;
-  if(startMarker){ startMarker.setMap(null); startMarker=null; }
+  pathCoords=[];
+  distanceKm=0;
+  elapsedTime=0;
+  if(movingMarker){ movingMarker.setMap(null); movingMarker=null; }
   if(endMarker){ endMarker.setMap(null); endMarker=null; }
   pathPolyline.setPath([]);
   updateDisplay();
