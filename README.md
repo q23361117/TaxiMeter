@@ -20,7 +20,7 @@ button.reset { background:#9E9E9E; }
 <body>
 
 <div class="card">
-<h3>🚖 Meter </h3>
+<h3>🚖 Taipei Meter </h3>
 <div class="result" id="timeRange">乘車時間：--</div>
 <div class="result">起步價：<span id="baseFare">60</span> 元</div>
 <div class="result">每公里費用：<span id="kmFare">15</span> 元/km</div>
@@ -104,28 +104,25 @@ function updateDisplay(){
     document.getElementById("totalFare").textContent = calculateFare();
 }
 
-// 建立起跳藍點
-function addStartMarker(position){
-    if(startMarker) startMarker.setMap(null);
-    startMarker = new google.maps.Marker({
-        position: position,
-        map: map,
-        icon: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-        zIndex:10000,
-        title:"起跳點"
-    });
-}
+// 起點 Marker（藍色）
+startMarker = new google.maps.Marker({
+  position: newCoord,
+  map: map,
+  icon: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+  zIndex: 9999,
+  title: "起跳點",
+  optimized: false   // ✅ 關鍵，確保不被 Polyline 或 Canvas 蓋住
+});
 
-// 建立終點紅點
-function addEndMarker(position){
-    if(endMarker) endMarker.setMap(null);
-    endMarker = new google.maps.Marker({
-        position: position,
-        map: map,
-        icon: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
-        zIndex:10000,
-        title:"終點"
-    });
+// 終點 Marker（紅色）
+endMarker = new google.maps.Marker({
+  position: last,
+  map: map,
+  icon: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
+  zIndex: 9999,
+  title: "終點",
+  optimized: false   // ✅
+});
 }
 
 function startTrip(){
