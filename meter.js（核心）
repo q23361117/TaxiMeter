@@ -1,0 +1,184 @@
+let map
+let polyline
+
+let path=[]
+
+let startMarker=null
+let endMarker=null
+
+let watchId
+
+let startTime
+
+let distanceKm=0
+
+let speed=0
+
+let timer
+
+function initMap(){
+
+map=new google.maps.Map(
+document.getElementById("map"),
+{
+zoom:13,
+center:{lat:24.15,lng:120.68}
+})
+
+polyline=new google.maps.Polyline({
+
+path:path,
+strokeColor:"#ff0000",
+strokeWeight:4
+
+})
+
+polyline.setMap(map)
+
+}
+
+function getDistanceKm(lat1,lon1,lat2,lon2){
+
+const R=6371
+
+const dLat=(lat2-lat1)*Math.PI/180
+const dLon=(lon2-lon1)*Math.PI/180
+
+const a=Math.sin(dLat/2)**2+
+Math.cos(lat1*Math.PI/180)*
+Math.cos(lat2*Math.PI/180)*
+Math.sin(dLon/2)**2
+
+const c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))
+
+return R*c
+
+}
+
+function startTrip(){
+
+updateConfig()
+
+startTime=Date.now()
+
+timer=setInterval(updateMeter,1000)
+
+watchId=navigator.geolocation.watchPosition(updateGPS)
+
+}
+
+function updateGPS(pos){
+
+let coord={
+lat:pos.coords.latitude,
+lng:pos.coords.longitude
+}
+
+if(!startMarker){
+
+startMarker=new google.maps.Marker({
+position:coord,
+map:map,
+icon:"https://maps.google.com/mapfiles/ms/icons/blue-dot.png"
+})
+
+}
+
+if(path.length>0){
+
+let last=path[path.length-1]
+
+let d=getDistanceKm(
+last.lat,last.lng,
+coord.lat,coord.lng)
+
+if(filterGPS(d)){
+
+distanceKm+=d
+
+speed=calculateSpeed(d,1)
+
+}
+
+}
+
+path.push(coord)
+
+polyline.setPath(path)
+
+map.setCenter(coord)
+
+}
+
+function updateMeter(){
+
+let time=(Date.now()-startTime)/60000
+
+let distCost=distanceKm*config.kmFare
+
+let waitCost=0
+
+if(speed<config.waitSpeed){
+
+waitCost=time*config.timeFare
+
+}
+
+let total=Math.round(
+config.baseFare+
+distCost+
+waitCost
+)
+
+document.getElementById("distance").innerText=
+distanceKm.toFixed(2)+" km"
+
+document.getElementById("time").innerText=
+Math.floor(time*60)+" 秒"
+
+document.getElementById("speed").innerText=
+speed.toFixed(1)+" km/h"
+
+document.getElementById("fare").innerText=
+total+" 元"
+
+}
+
+function pauseTrip(){
+
+clearInterval(timer)
+
+navigator.geolocation.clearWatch(watchId)
+
+}
+
+function endTrip(){
+
+pauseTrip()
+
+let last=path[path.length-1]
+
+endMarker=new google.maps.Marker({
+
+position:last,
+map:map,
+icon:"https://maps.google.com/mapfiles/ms/icons/red-dot.png"
+
+})
+
+}
+
+function resetTrip(){
+
+pauseTrip()
+
+distanceKm=0
+path=[]
+
+polyline.setPath([])
+
+if(startMarker)startMarker.setMap(null)
+
+if(endMarker)endMarker.setMap(null)
+
+}
