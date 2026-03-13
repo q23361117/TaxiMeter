@@ -51,18 +51,18 @@ let distanceKm = 0;
 let startTime = 0;
 let elapsedTime = 0;
 let timerInterval = null;
-let startBlinkInterval = null;
-let endBlinkInterval = null;
 
 const baseFare = 60;
 const kmFare = 15;
 const timeFare = 3; // 每分鐘費用
 
-const blueIcon = "https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png";
-const redIcon = "https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png";
+// 起點藍點
+const blueIcon = "https://maps.google.com/mapfiles/ms/icons/blue-dot.png";
+// 終點紅點
+const redIcon = "https://maps.google.com/mapfiles/ms/icons/red-dot.png";
 
 function initMap(){
-  map = new google.maps.Map(document.getElementById("map"),{
+  map = new google.maps.Map(document.getElementById("map"), {
     zoom: 12,
     center: {lat:24.15, lng:120.68},
     mapTypeId: 'roadmap'
@@ -110,54 +110,31 @@ function updateDisplay(){
   document.getElementById("totalFare").textContent = calculateFare();
 }
 
-// 起點 Marker（藍點）
 function addStartMarker(position){
   if(startMarker) startMarker.setMap(null);
   startMarker = new google.maps.Marker({
     position,
     map,
     icon: blueIcon,
-    zIndex:99999,
-    title:"起跳點",
-    optimized:false
+    zIndex: 9999,
+    title: "起跳點",
+    optimized: false
   });
-  blinkMarker(startMarker, "start");
 }
 
-// 終點 Marker（紅點）
 function addEndMarker(position){
   if(endMarker) endMarker.setMap(null);
   endMarker = new google.maps.Marker({
     position,
     map,
     icon: redIcon,
-    zIndex:99999,
-    title:"終點",
-    optimized:false
+    zIndex: 9999,
+    title: "終點",
+    optimized: false
   });
-  blinkMarker(endMarker, "end");
-}
-
-// Marker 閃動
-function blinkMarker(marker, type){
-  let visible = true;
-  const interval = setInterval(()=>{
-    if(marker){
-      marker.setVisible(visible);
-      visible = !visible;
-    } else clearInterval(interval);
-  }, 500);
-  if(type==="start") startBlinkInterval = interval;
-  else endBlinkInterval = interval;
-}
-
-function stopBlink(){
-  if(startBlinkInterval) clearInterval(startBlinkInterval);
-  if(endBlinkInterval) clearInterval(endBlinkInterval);
 }
 
 function startTrip(){
-  stopBlink();
   if(!timerInterval){
     startTime = Date.now() - elapsedTime;
     timerInterval = setInterval(()=>{
@@ -165,23 +142,22 @@ function startTrip(){
       updateDisplay();
     },1000);
   }
+
   if(navigator.geolocation){
     watchId = navigator.geolocation.watchPosition(pos=>{
       const newCoord = {lat: pos.coords.latitude, lng: pos.coords.longitude};
 
-      if(!startMarker){
-        addStartMarker(newCoord);
-      }
+      if(!startMarker) addStartMarker(newCoord);
 
       if(pathCoords.length > 0){
-        const last = pathCoords[pathCoords.length-1];
+        const last = pathCoords[pathCoords.length - 1];
         distanceKm += getDistanceKm(last.lat,last.lng,newCoord.lat,newCoord.lng);
       }
 
       pathCoords.push(newCoord);
       pathPolyline.setPath(pathCoords);
       map.setCenter(newCoord);
-    }, err=>{alert("GPS定位失敗")},{enableHighAccuracy:true});
+    }, err => { alert("GPS定位失敗"); }, { enableHighAccuracy:true });
   }
 }
 
@@ -196,9 +172,8 @@ function pauseTrip(){
 
 function endTrip(){
   pauseTrip();
-  stopBlink();
   if(pathCoords.length > 0){
-    const last = pathCoords[pathCoords.length-1];
+    const last = pathCoords[pathCoords.length - 1];
     addEndMarker(last);
   }
   alert(`行程結束！\n總距離: ${distanceKm.toFixed(2)} km\n總費用: ${calculateFare()} 元`);
@@ -206,7 +181,6 @@ function endTrip(){
 
 function resetTrip(){
   pauseTrip();
-  stopBlink();
   pathCoords = [];
   distanceKm = 0;
   elapsedTime = 0;
@@ -218,7 +192,7 @@ function resetTrip(){
 </script>
 
 <script async
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCMi3iCO0lZuw3XfaUoKxBrQJMGFbiz5po&callback=initMap">
+  src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap">
 </script>
 
 </body>
