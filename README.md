@@ -62,12 +62,13 @@ function initMap(){
         center: {lat:24.15, lng:120.68},
         mapTypeId: 'roadmap'
     });
+
     pathPolyline = new google.maps.Polyline({
         path: pathCoords,
         geodesic:true,
         strokeColor:"#FF0000",
         strokeWeight:4,
-        zIndex:9999
+        zIndex:1  // 線在下層
     });
     pathPolyline.setMap(map);
 }
@@ -104,25 +105,30 @@ function updateDisplay(){
     document.getElementById("totalFare").textContent = calculateFare();
 }
 
-// 起點 Marker（藍色）
-startMarker = new google.maps.Marker({
-  position: newCoord,
-  map: map,
-  icon: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-  zIndex: 9999,
-  title: "起跳點",
-  optimized: false   // ✅ 關鍵，確保不被 Polyline 或 Canvas 蓋住
-});
+// 建立起點 Marker（藍色）
+function addStartMarker(position){
+    if(startMarker) startMarker.setMap(null);
+    startMarker = new google.maps.Marker({
+        position: position,
+        map: map,
+        icon: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+        zIndex: 9999,
+        title: "起跳點",
+        optimized: false
+    });
+}
 
-// 終點 Marker（紅色）
-endMarker = new google.maps.Marker({
-  position: last,
-  map: map,
-  icon: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
-  zIndex: 9999,
-  title: "終點",
-  optimized: false   // ✅
-});
+// 建立終點 Marker（紅色）
+function addEndMarker(position){
+    if(endMarker) endMarker.setMap(null);
+    endMarker = new google.maps.Marker({
+        position: position,
+        map: map,
+        icon: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
+        zIndex: 9999,
+        title: "終點",
+        optimized: false
+    });
 }
 
 function startTrip(){
