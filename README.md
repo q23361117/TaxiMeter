@@ -104,7 +104,10 @@ function updateDisplay(){
     document.getElementById("elapsedTime").textContent = formatTime(elapsedTime);
     document.getElementById("totalFare").textContent = calculateFare();
 }
-
+    <script>
+const blueIcon = "https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png";
+const redIcon = "https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png";
+    
 // 建立起點 Marker（藍色）
 function addStartMarker(position){
     if(startMarker) startMarker.setMap(null);
