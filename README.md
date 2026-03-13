@@ -111,10 +111,10 @@ function addStartMarker(position){
     startMarker = new google.maps.Marker({
         position: position,
         map: map,
-        icon: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-        zIndex: 9999,
+        icon:  blueIcon,
+        zIndex: 99999,
         title: "起跳點",
-        optimized: false
+        
     });
 }
 
@@ -124,10 +124,10 @@ function addEndMarker(position){
     endMarker = new google.maps.Marker({
         position: position,
         map: map,
-        icon: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
-        zIndex: 9999,
+        icon: redIcon,
+        zIndex: 99999,
         title: "終點",
-        optimized: false
+        
     });
 }
 
