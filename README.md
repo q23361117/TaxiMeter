@@ -114,7 +114,7 @@ function addStartMarker(position){
         icon:  blueIcon,
         zIndex: 99999,
         title: "起跳點",
-        
+        optimized: false
     });
 }
 
@@ -127,7 +127,7 @@ function addEndMarker(position){
         icon: redIcon,
         zIndex: 99999,
         title: "終點",
-        
+        optimized: false
     });
 }
 
