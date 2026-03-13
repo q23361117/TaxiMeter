@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>計程車 GPS 計費器</title>
+<title>計程車 GPS + 路線跳錶</title>
 <style>
 body { font-family: Arial, sans-serif; margin:0; padding:0; text-align:center; }
 #map { height:50vh; width:100%; }
@@ -14,9 +14,8 @@ input, button { font-size:16px; padding:5px; margin:5px; }
 </head>
 <body>
 
-<h2>計程車 GPS 計費器</h2>
+<h2>計程車 GPS + 路線跳錶</h2>
 
-<!-- 地圖放在控制面板上方 -->
 <div id="map"></div>
 
 <div id="controls">
@@ -44,6 +43,10 @@ let watchId=null, pathCoords=[], polylinePath;
 let startTime=0, elapsedTime=0, timerInterval=null;
 let prevPos=null, distanceKm=0;
 
+// Directions
+let directionsService=null, directionsRenderer=null;
+let startLatLng=null, endLatLng=null;
+
 // 初始化地圖
 function initMap(){
     map = new google.maps.Map(document.getElementById("map"), {
@@ -61,6 +64,15 @@ function initMap(){
         strokeWeight: 4
     });
     polylinePath.setMap(map);
+
+    // 初始化 Directions
+    directionsService = new google.maps.DirectionsService();
+    directionsRenderer = new google.maps.DirectionsRenderer({
+        map: map,
+        suppressMarkers: true,
+        draggable: true,
+        polylineOptions: { strokeColor: "#4285F4", strokeWeight: 5, zIndex: 1 }
+    });
 }
 
 // 格式化時間
@@ -104,6 +116,39 @@ function calculateFare(){
     return Math.round(fare);
 }
 
+// 計算 Directions 路線
+function updateRoute(){
+    if(!startLatLng || !endLatLng) return;
+    directionsService.route({
+        origin: startLatLng,
+        destination: endLatLng,
+        travelMode: google.maps.TravelMode.DRIVING
+    }, function(response, status){
+        if(status === "OK"){
+            directionsRenderer.setDirections(response);
+            const leg = response.routes[0].legs[0];
+
+            // 起終點 Marker
+            if(!startMarker){
+                startMarker = new google.maps.Marker({
+                    position: leg.start_location,
+                    map: map,
+                    icon: "https://maps.google.com/mapfiles/ms/icons/green-dot.png",
+                    zIndex: 9999
+                });
+            }
+            if(!endMarker){
+                endMarker = new google.maps.Marker({
+                    position: leg.end_location,
+                    map: map,
+                    icon: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
+                    zIndex: 9999
+                });
+            }
+        }
+    });
+}
+
 // 開始行程
 function startTrip(){
     if(!timerInterval){
@@ -121,31 +166,23 @@ function startTrip(){
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
 
-                // ✅ 起點 Marker
-                if(!startMarker){
-                    startMarker = new google.maps.Marker({
-                        position: {lat: lat, lng: lon},
-                        map: map,
-                        icon: "https://maps.google.com/mapfiles/ms/icons/green-dot.png",
-                        zIndex: 9999
-                    });
-                }
+                if(!startLatLng) startLatLng = new google.maps.LatLng(lat, lon);
+                endLatLng = new google.maps.LatLng(lat, lon); // 終點即時更新
+
+                // 更新建議路線和 Marker
+                updateRoute();
 
                 // 累計距離
                 if(prevPos){
-                    distanceKm += getDistanceKm(prevPos.lat, prevPos.lng, lat, lon);
+                    distanceKm += getDistanceKm(prevPos.lat(), prevPos.lng(), lat, lon);
                     document.getElementById("distance").textContent="里程: "+distanceKm.toFixed(2)+" km";
                 }
-                prevPos={lat: lat, lng: lon};
+                prevPos = new google.maps.LatLng(lat, lon);
 
-                // 軌跡線
-                const latlng = new google.maps.LatLng(lat, lon);
-                pathCoords.push(latlng);
+                // 即時行駛軌跡紅線
+                pathCoords.push(prevPos);
                 polylinePath.setPath(pathCoords);
-                map.setCenter(latlng);
-
-                // 即時車輛 Marker
-                new google.maps.Marker({position:latlng,map});
+                map.setCenter(prevPos);
             },
             err=>{console.error(err); alert("GPS 無法取得定位");},
             {enableHighAccuracy:true, maximumAge:0, timeout:5000}
@@ -164,16 +201,6 @@ function endTrip(){
     if(watchId){navigator.geolocation.clearWatch(watchId); watchId=null;}
     clearInterval(timerInterval); timerInterval=null;
 
-    // ✅ 終點 Marker
-    if(prevPos && !endMarker){
-        endMarker = new google.maps.Marker({
-            position: {lat: prevPos.lat, lng: prevPos.lng},
-            map: map,
-            icon: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
-            zIndex: 9999
-        });
-    }
-
     alert("行程結束！\n總里程: "+distanceKm.toFixed(2)+" km\n總車資: "+calculateFare()+" 元");
 }
 
@@ -181,6 +208,7 @@ function endTrip(){
 function resetTrip(){
     clearInterval(timerInterval); timerInterval=null;
     elapsedTime=0; distanceKm=0; prevPos=null; pathCoords=[];
+    startLatLng=null; endLatLng=null;
     document.getElementById("timer").textContent="時間: 00:000";
     document.getElementById("distance").textContent="里程: 0.00 km";
     document.getElementById("fare").textContent="車資: 0 元";
@@ -188,6 +216,7 @@ function resetTrip(){
     if(startMarker) startMarker.setMap(null); startMarker=null;
     if(endMarker) endMarker.setMap(null); endMarker=null;
     if(watchId){navigator.geolocation.clearWatch(watchId); watchId=null;}
+    directionsRenderer.setDirections({routes: []}); // 清除路線
 }
 </script>
 
