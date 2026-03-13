@@ -1,105 +1,17 @@
 TaxiMeterApp/
-├─ app/
-│   └─ (tabs)/index.tsx        # 主頁面跳錶 UI
-├─ components/
-│   └─ TimerDisplay.tsx         # 跳錶顯示元件
-├─ constants/
-│   └─ rates.ts                 # 費率設定
-├─ hooks/
-│   └─ useTimer.ts              # 跳錶邏輯
-├─ assets/                      # 圖片資源（可留空）
+├─ App.js
 ├─ package.json
-├─ package-lock.json
-├─ app.json
-├─ tsconfig.json
-└─ eas.json
-
-
-export const Rates = {
-  baseFare: 70,   // 起跳價
-  perKm: 25,      // 每公里
-  perMin: 5,      // 每分鐘
-  kmExtra: 10     // 超過公里加成
-};
-
-
-import { useState, useRef, useEffect } from 'react';
-
-export function useTimer() {
-  const [seconds, setSeconds] = useState(0);
-  const [running, setRunning] = useState(false);
-  const timerRef = useRef<NodeJS.Timer | null>(null);
-
-  const start = () => {
-    if (!running) {
-      setRunning(true);
-      timerRef.current = setInterval(() => setSeconds(s => s + 1), 1000);
-    }
-  };
-
-  const pause = () => {
-    if (running) {
-      setRunning(false);
-      if (timerRef.current) clearInterval(timerRef.current);
-    }
-  };
-
-  const reset = () => {
-    setRunning(false);
-    if (timerRef.current) clearInterval(timerRef.current);
-    setSeconds(0);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, []);
-
-  return { seconds, running, start, pause, reset };
-}
-
-
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-
-type Props = {
-  seconds: number;
-};
-
-export const TimerDisplay: React.FC<Props> = ({ seconds }) => {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return (
-    <View style={styles.container}>
-      <Text style={styles.time}>{`${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`}</Text>
-    </View>
-  );
-};
-
-const styles = StyleSheet.create({
-  container: { alignItems: 'center', margin: 20 },
-  time: { fontSize: 48, fontWeight: 'bold' }
-});
-
-
-import React from 'react';
-import { View, Button } from 'react-native';
-import { useTimer } from '../../hooks/useTimer';
-import { TimerDisplay } from '../../components/TimerDisplay';
-
-export default function MainScreen() {
-  const { seconds, running, start, pause, reset } = useTimer();
-
-  return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <TimerDisplay seconds={seconds} />
-      <Button title={running ? "暫停" : "開始"} onPress={running ? pause : start} />
-      <Button title="重置" onPress={reset} />
-    </View>
-  );
-}
-
+├─ assets/
+│  └─ icon.png
+├─ components/
+│  ├─ MeterDisplay.js
+│  └─ StartStopButton.js
+├─ screens/
+│  ├─ HomeScreen.js
+│  └─ HistoryScreen.js
+├─ utils/
+│  └─ calculateFare.js
+└─ README.md
 
 {
   "name": "TaxiMeterApp",
@@ -112,44 +24,155 @@ export default function MainScreen() {
     "web": "expo start --web"
   },
   "dependencies": {
-    "expo": "~48.0.0",
-    "expo-status-bar": "~1.4.0",
+    "expo": "~50.0.0",
+    "expo-location": "~16.0.0",
     "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "react-native": "0.71.8",
-    "react-native-web": "~0.19.12"
-  },
-  "devDependencies": {
-    "typescript": "^5.2.2"
+    "react-native": "0.72.3"
   }
 }
 
+export const calculateFare = (distanceKm, waitingMinutes) => {
+  const baseFare = 70;      // 起跳價
+  const perKm = 20;         // 每公里費
+  const perMinuteWait = 5;  // 每分鐘等候費
 
-{
-  "expo": {
-    "name": "TaxiMeterApp",
-    "slug": "TaxiMeterApp",
-    "platforms": ["ios","android","web"],
-    "version": "1.0.0",
-    "sdkVersion": "48.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "updates": { "fallbackToCacheTimeout": 0 },
-    "ios": { "supportsTablet": true }
-  }
+  const distanceFare = distanceKm * perKm;
+  const waitingFare = waitingMinutes * perMinuteWait;
+
+  const totalFare = baseFare + distanceFare + waitingFare;
+  return totalFare;
+};
+
+import React, { useState, useEffect } from 'react';
+import { View, Text, Button, StyleSheet } from 'react-native';
+import * as Location from 'expo-location';
+import { calculateFare } from '../utils/calculateFare';
+
+export default function MeterDisplay({ onSaveRecord }) {
+  const [running, setRunning] = useState(false);
+  const [distance, setDistance] = useState(0);
+  const [waiting, setWaiting] = useState(0);
+  const [fare, setFare] = useState(0);
+  const [prevLocation, setPrevLocation] = useState(null);
+
+  useEffect(() => {
+    let timer;
+    let locWatcher;
+
+    const startMeter = async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+
+      locWatcher = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.Highest, timeInterval: 1000, distanceInterval: 1 },
+        (location) => {
+          if (prevLocation) {
+            const dx = location.coords.latitude - prevLocation.latitude;
+            const dy = location.coords.longitude - prevLocation.longitude;
+            const km = Math.sqrt(dx*dx + dy*dy) * 111; // 粗略換算 km
+            setDistance(prev => prev + km);
+            setFare(calculateFare(distance + km, waiting));
+          }
+          setPrevLocation(location.coords);
+        }
+      );
+
+      timer = setInterval(() => {
+        setWaiting(prev => prev + 1/60); // 每秒增加分鐘
+        setFare(calculateFare(distance, waiting + 1/60));
+      }, 1000);
+    };
+
+    if (running) startMeter();
+    else {
+      if (locWatcher) locWatcher.remove();
+      if (timer) clearInterval(timer);
+    }
+
+    return () => {
+      if (locWatcher) locWatcher.remove();
+      if (timer) clearInterval(timer);
+    };
+  }, [running, prevLocation, distance, waiting]);
+
+  const stopMeter = () => {
+    setRunning(false);
+    onSaveRecord && onSaveRecord({ distance, waiting, fare, timestamp: new Date() });
+    setDistance(0);
+    setWaiting(0);
+    setFare(0);
+    setPrevLocation(null);
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.text}>距離: {distance.toFixed(2)} km</Text>
+      <Text style={styles.text}>等候: {waiting.toFixed(2)} 分鐘</Text>
+      <Text style={styles.text}>計費: NT$ {fare.toFixed(0)}</Text>
+      <Button title={running ? "停止" : "開始"} onPress={() => running ? stopMeter() : setRunning(true)} />
+    </View>
+  );
 }
 
-cd TaxiMeterApp
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/q23361117@gmail.com/TaxiMeterApp.git
-git push -u origin main
+const styles = StyleSheet.create({
+  container: { padding: 20, alignItems: 'center' },
+  text: { fontSize: 18, marginVertical: 5 }
+});
 
+import React, { useState } from 'react';
+import { View, ScrollView, Text, StyleSheet } from 'react-native';
+import MeterDisplay from '../components/MeterDisplay';
+
+export default function HomeScreen() {
+  const [history, setHistory] = useState([]);
+
+  const saveRecord = (record) => setHistory(prev => [record, ...prev]);
+
+  return (
+    <ScrollView style={styles.container}>
+      <MeterDisplay onSaveRecord={saveRecord} />
+      <Text style={styles.header}>歷史紀錄</Text>
+      {history.map((h, i) => (
+        <View key={i} style={styles.record}>
+          <Text>{h.timestamp.toLocaleString()}</Text>
+          <Text>距離: {h.distance.toFixed(2)} km | 等候: {h.waiting.toFixed(2)} 分鐘 | NT$ {h.fare.toFixed(0)}</Text>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  header: { fontSize: 20, marginTop: 20, marginLeft: 10 },
+  record: { padding: 10, borderBottomWidth: 1, borderColor: '#ccc' }
+});
+
+import React from 'react';
+import { SafeAreaView } from 'react-native';
+import HomeScreen from './screens/HomeScreen';
+
+export default function App() {
+  return (
+    <SafeAreaView style={{ flex: 1 }}>
+      <HomeScreen />
+    </SafeAreaView>
+  );
+}
+
+# TaxiMeterApp
+
+一個 iOS / Android 跳錶計程車計費範例程式，使用 React Native + Expo 開發。
+
+## 功能
+- GPS 路程計算
+- 跳錶計費
+- 等候時間計費
+- 歷史紀錄
+
+## 開發 & 測試
+1. 安裝依賴
+```bash
 npm install
 
-npm run web
-
-npm run android
-
+npm start
