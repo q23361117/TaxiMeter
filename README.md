@@ -56,6 +56,10 @@ const baseFare = 60;
 const kmFare = 15;
 const timeFare = 3; // 每分鐘費用
 
+// Marker 圖示
+const blueIcon = "https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png";
+const redIcon = "https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png";
+
 function initMap(){
   map = new google.maps.Map(document.getElementById("map"),{
     zoom: 12,
@@ -68,7 +72,7 @@ function initMap(){
     geodesic:true,
     strokeColor:"#FF0000",
     strokeWeight:4,
-    zIndex:1  // 線在下層
+    zIndex:1
   });
   pathPolyline.setMap(map);
 }
@@ -105,33 +109,30 @@ function updateDisplay(){
   document.getElementById("totalFare").textContent = calculateFare();
 }
 
-// 起點藍點圖示網址
-const blueIcon = "https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png";
-// 終點紅點圖示網址
-const redIcon = "https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png";
-
+// 建立起點 Marker（藍點）
 function addStartMarker(position){
   if(startMarker) startMarker.setMap(null);
-  startMarker = new google.maps.marker.AdvancedMarkerElement({
-map: map,
-position: leg.start_location,
-content: new google.maps.marker.PinElement({
-background: "#4CAF50",
-glyphColor: "white"
-}).element
-});
+  startMarker = new google.maps.Marker({
+    position,
+    map,
+    icon: blueIcon,
+    zIndex: 99999,
+    title: "起跳點",
+    optimized: false
+  });
 }
 
+// 建立終點 Marker（紅點）
 function addEndMarker(position){
   if(endMarker) endMarker.setMap(null);
- endMarker = new google.maps.marker.AdvancedMarkerElement({
-map: map,
-position: leg.end_location,
-content: new google.maps.marker.PinElement({
-background: "#FF0000",
-glyphColor: "white"
-}).element
-});
+  endMarker = new google.maps.Marker({
+    position,
+    map,
+    icon: redIcon,
+    zIndex: 99999,
+    title: "終點",
+    optimized: false
+  });
 }
 
 function startTrip(){
